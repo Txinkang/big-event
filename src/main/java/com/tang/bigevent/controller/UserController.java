@@ -95,7 +95,7 @@ public class UserController {
             userService.updateUserPassword(loginUser.getId(),new_pwd);
             return Result.success();
         }
-
+int a=1;
         if (!StringUtils.hasLength(old_pwd) || !StringUtils.hasLength(new_pwd) || !StringUtils.hasLength(re_pwd)){
             return Result.error("参数无效");
         }
