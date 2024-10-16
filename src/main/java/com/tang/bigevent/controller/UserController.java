@@ -9,12 +9,14 @@ import com.tang.bigevent.utils.ThreadLocalUtil;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -23,6 +25,8 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    @Autowired
+    private RedisTemplate<String,String> redisTemplate;
 
     //注册
     @PostMapping("/register")
@@ -49,6 +53,8 @@ public class UserController {
             claims.put("id",loginUser.getId());
             claims.put("username",loginUser.getUsername());
             String token= JwtUtil.genToken(claims);
+            //把token往redis存一份，6小时后过期
+            redisTemplate.opsForValue().set(token,token,6, TimeUnit.HOURS);
             return Result.success(token);
         }
         return Result.error("密码错误");
@@ -79,7 +85,7 @@ public class UserController {
 
     //更改用户密码
     @PatchMapping("/updatePwd")
-    public Result updatePwd(@RequestBody Map<String,String> pwd){
+    public Result updatePwd(@RequestBody Map<String,String> pwd,@RequestHeader("Authorization") String token){
         //获取参数
         String old_pwd=pwd.get("old_pwd");
         String new_pwd=pwd.get("new_pwd");
@@ -89,13 +95,14 @@ public class UserController {
         Map<String,Object> map=ThreadLocalUtil.get();
         String username= (String) map.get("username");
         User loginUser=userService.findByuserName(username);
-        //System.out.println(loginUser);
         if (loginUser.getPassword().equals(Md5Util.getMD5String(old_pwd)) && new_pwd.equals(re_pwd)){
             new_pwd=Md5Util.getMD5String(new_pwd);
             userService.updateUserPassword(loginUser.getId(),new_pwd);
+            //更新成功，删除redis，使用户重新登录
+            redisTemplate.opsForValue().getAndDelete(token);
             return Result.success();
         }
-int a=1;
+
         if (!StringUtils.hasLength(old_pwd) || !StringUtils.hasLength(new_pwd) || !StringUtils.hasLength(re_pwd)){
             return Result.error("参数无效");
         }

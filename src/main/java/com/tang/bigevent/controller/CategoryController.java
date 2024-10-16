@@ -39,7 +39,7 @@ public class CategoryController {
 
     //更新文章分类
     @PutMapping("/update")
-    public Result update(@RequestBody @Validated Category category){
+    public Result update(@RequestBody @Validated(Category.Update.class) Category category){
         categoryService.update(category);
         return Result.success();
     }
